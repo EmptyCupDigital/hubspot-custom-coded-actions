@@ -7,31 +7,14 @@ exports.main = async (event, callback) => {
         accessToken: process.env.YOUR_ACCESS_TOKEN // Make sure to set this in your environment variables
     });
 
-    // Assuming originalID is passed from the custom coded workflow action input fields
-    const originalID = event.inputFields['hs_object_id'];
+    // The enrolled deal's 'Original Deal ID' property and its Record ID property should be passed in via input fields.
+    const originalID = event.inputFields['original_deal_id'];
+    const renewalDealID = event.inputFields['hubspot_object_id']
 
-   const PublicObjectSearchRequest = { 
-     limit: 1, 
-     properties: ["dealname","amount","hubspot_owner_id"], 
-     filterGroups: [
-       {"filters":[
-         {"propertyName": "original_deal_id",
-          "value": originalID,
-          "operator": "EQ"}]}]
-   };
-
-   try 
-   {
-  const apiResponse = await hubspotClient.crm.deals.searchApi.doSearch(PublicObjectSearchRequest);
-   console.log(JSON.stringify(apiResponse, null, 2));
-     
-     if(apiResponse.results)
-       {
-		const renewalDealID = apiResponse.results[0].id;
 		const objectType = "deal";
-		const objectId = originalID;
+		const objectId = renewalDealID;
 		const toObjectType = "deal";
-		const toObjectId = renewalDealID;
+		const toObjectId = originalID;
 		const AssociationSpec = [
   {
     "associationCategory": "USER_DEFINED",
@@ -56,16 +39,5 @@ exports.main = async (event, callback) => {
                 } else {
                     console.error(e);
                 }
-            }
-       }
-} 
-  
-  catch (e) 
-  {
-  e.message === 'HTTP request failed'
-    ? console.error(JSON.stringify(e.response, null, 2))
-    : console.error(e)
-}
-  
-       
+            }     
 };
