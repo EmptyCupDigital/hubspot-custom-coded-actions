@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Replace with your HubSpot API access token
-const API_ACCESS_TOKEN = process.env.HUBSPOT_API; // Assuming your Secret is called HUBSPOT_API
+const API_ACCESS_TOKEN = process.env.HUBSPOT_API;
 
 // HubSpot API endpoints
 const HUBSPOT_CONTACTS_SEARCH_URL = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
@@ -44,9 +44,10 @@ async function getAssociatedContacts(companyId) {
 }
 
 // Function to get live chat conversations for a contact, filtered by last 30 days
-async function getConversations(contactId) {
+async function getOpenConversations(contactId) {
   try {
     const thirtyDaysAgo = getDate30DaysAgo();
+    
 
     const response = await axios.get(`${HUBSPOT_CONVERSATIONS_URL}`, {
       headers: {
@@ -58,10 +59,38 @@ async function getConversations(contactId) {
         'sort': 'latestMessageTimestamp',
         'conversationSource': 'LIVE_CHAT',
         'associatedContactId': contactId,
+        'threadStatus': 'OPEN',
       },
     });
     
-    console.log("First Conversation Thread Result: " + JSON.stringify(response.data.results[0]));
+    console.log("First Conversation Thread Result For Contact ID " + contactId + ": " + JSON.stringify(response.data.results[0]));
+    return response.data.results.length; // Return the count of conversations for the contact
+  } catch (error) {
+    console.error('Error fetching conversations:', error.response ? error.response.data : error.message);
+    throw new Error('Failed to fetch conversations.');
+  }
+}
+
+async function getClosedConversations(contactId) {
+  try {
+    const thirtyDaysAgo = getDate30DaysAgo();
+    
+
+    const response = await axios.get(`${HUBSPOT_CONVERSATIONS_URL}`, {
+      headers: {
+        Authorization: `Bearer ${API_ACCESS_TOKEN}`,
+      },
+      params: {
+        // Filter for live chat conversations associated with the contact created in the last 30 days
+        'latestMessageTimestampAfter': thirtyDaysAgo,
+        'sort': 'latestMessageTimestamp',
+        'conversationSource': 'LIVE_CHAT',
+        'associatedContactId': contactId,
+        'threadStatus': 'CLOSED',
+      },
+    });
+    
+    console.log("First Conversation Thread Result For Contact ID " + contactId + ": " + JSON.stringify(response.data.results[0]));
     return response.data.results.length; // Return the count of conversations for the contact
   } catch (error) {
     console.error('Error fetching conversations:', error.response ? error.response.data : error.message);
@@ -74,13 +103,15 @@ async function getTotalConversationsForCompany(companyId) {
   try {
     // Step 1: Fetch all associated contacts
     const contactIds = await getAssociatedContacts(companyId);
-	console.log("Contact IDs: " + contactIds);
+	console.log("Contact IDs attempting to retrieve threads from: " + contactIds);
     let totalConversations = 0;
 
     // Step 2: Fetch and count conversations for each contact
     for (const contactId of contactIds) {
-      const conversationCount = await getConversations(contactId);
-      totalConversations += conversationCount;
+      const openConversationCount = await getOpenConversations(contactId);
+      const closedConversationCount = await getClosedConversations(contactId);
+      totalConversations += openConversationCount;
+      totalConversations += closedConversationCount;
     }
     console.log("Total Number of Conversations: " + totalConversations);
     return totalConversations;
